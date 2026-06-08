@@ -17,7 +17,8 @@ function getNewsUrl(query) {
         return `/api/news?q=${encodeURIComponent(query)}&t=${Date.now()}`;
     } else {
         const googleNewsUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=ja&gl=JP&ceid=JP:ja`;
-        return `https://api.allorigins.win/get?url=${encodeURIComponent(googleNewsUrl + `&t=${Date.now()}`)}`;
+        // Use CodeTabs CORS proxy which returns raw XML directly
+        return `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(googleNewsUrl + `&t=${Date.now()}`)}`;
     }
 }
 
@@ -413,12 +414,20 @@ async function fetchNewsForActiveStock(isManual = false) {
         const response = await fetch(requestUrl);
         if (!response.ok) throw new Error("ニュースデータの取得に失敗しました");
         
-        const data = await response.json();
-        if (!data.contents) throw new Error("フィードデータを取得できませんでした");
+        let xmlText = "";
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+            const data = await response.json();
+            xmlText = data.contents;
+        } else {
+            xmlText = await response.text();
+        }
+        
+        if (!xmlText) throw new Error("フィードデータを取得できませんでした");
         
         // Parse XML
         const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(data.contents, "text/xml");
+        const xmlDoc = parser.parseFromString(xmlText, "text/xml");
         const items = xmlDoc.getElementsByTagName("item");
         
         const parsedArticles = [];
