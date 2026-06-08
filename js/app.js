@@ -17,8 +17,8 @@ function getNewsUrl(query) {
         return `/api/news?q=${encodeURIComponent(query)}&t=${Date.now()}`;
     } else {
         const googleNewsUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=ja&gl=JP&ceid=JP:ja`;
-        // Use CodeTabs CORS proxy which returns raw XML directly
-        return `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(googleNewsUrl + `&t=${Date.now()}`)}`;
+        // Use rss2json API for robust production feed conversion
+        return `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(googleNewsUrl)}`;
     }
 }
 
@@ -414,54 +414,112 @@ async function fetchNewsForActiveStock(isManual = false) {
         const response = await fetch(requestUrl);
         if (!response.ok) throw new Error("ニュースデータの取得に失敗しました");
         
-        let xmlText = "";
+        let parsedArticles = [];
+        const now = new Date();
+        
         const contentType = response.headers.get("content-type");
         if (contentType && contentType.includes("application/json")) {
             const data = await response.json();
-            xmlText = data.contents;
+            
+            // Check if this is the rss2json format (production environment)
+            if (data && data.status === "ok" && data.items) {
+                data.items.forEach(item => {
+                    const rawTitle = item.title || "";
+                    const link = item.link || "";
+                    const pubDateStr = item.pubDate || "";
+                    // Convert "2026-06-07 05:41:42" to Date (append Z to parse as UTC)
+                    const formattedDateStr = pubDateStr.replace(" ", "T") + "Z";
+                    const pubDate = new Date(formattedDateStr);
+                    
+                    const parts = rawTitle.split(" - ");
+                    const source = parts.length > 1 ? parts.pop() : "Google ニュース";
+                    const cleanTitle = parts.join(" - ");
+                    
+                    const { sentiment, matchedKeywords, isImportant } = analyzeSentimentAndImportance(cleanTitle);
+                    const isNew = (now - pubDate) < (30 * 60 * 1000);
+                    
+                    parsedArticles.push({
+                        id: btoa(encodeURIComponent(link)).substring(0, 32),
+                        title: cleanTitle,
+                        link,
+                        source,
+                        pubDate,
+                        sentiment,
+                        matchedKeywords,
+                        isImportant,
+                        isNew
+                    });
+                });
+            } else if (data && data.contents) {
+                // Parse XML from local proxy wrapping
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(data.contents, "text/xml");
+                const items = xmlDoc.getElementsByTagName("item");
+                
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i];
+                    const rawTitle = item.getElementsByTagName("title")[0]?.textContent || "";
+                    const link = item.getElementsByTagName("link")[0]?.textContent || "";
+                    const pubDateStr = item.getElementsByTagName("pubDate")[0]?.textContent || "";
+                    const pubDate = new Date(pubDateStr);
+                    
+                    const parts = rawTitle.split(" - ");
+                    const source = parts.length > 1 ? parts.pop() : "Google ニュース";
+                    const cleanTitle = parts.join(" - ");
+                    
+                    const { sentiment, matchedKeywords, isImportant } = analyzeSentimentAndImportance(cleanTitle);
+                    const isNew = (now - pubDate) < (30 * 60 * 1000);
+                    
+                    parsedArticles.push({
+                        id: btoa(encodeURIComponent(link)).substring(0, 32),
+                        title: cleanTitle,
+                        link,
+                        source,
+                        pubDate,
+                        sentiment,
+                        matchedKeywords,
+                        isImportant,
+                        isNew
+                    });
+                }
+            } else {
+                throw new Error("取得したデータの形式が正しくありません");
+            }
         } else {
-            xmlText = await response.text();
-        }
-        
-        if (!xmlText) throw new Error("フィードデータを取得できませんでした");
-        
-        // Parse XML
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(xmlText, "text/xml");
-        const items = xmlDoc.getElementsByTagName("item");
-        
-        const parsedArticles = [];
-        const now = new Date();
-        
-        for (let i = 0; i < items.length; i++) {
-            const item = items[i];
-            const rawTitle = item.getElementsByTagName("title")[0]?.textContent || "";
-            const link = item.getElementsByTagName("link")[0]?.textContent || "";
-            const pubDateStr = item.getElementsByTagName("pubDate")[0]?.textContent || "";
-            const pubDate = new Date(pubDateStr);
+            // Raw XML fallback
+            const xmlText = await response.text();
+            if (!xmlText) throw new Error("フィードデータを取得できませんでした");
             
-            // Format Google News title (Split "Title - Source")
-            const parts = rawTitle.split(" - ");
-            const source = parts.length > 1 ? parts.pop() : "Google ニュース";
-            const cleanTitle = parts.join(" - ");
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+            const items = xmlDoc.getElementsByTagName("item");
             
-            // Analyze sentiment & importance
-            const { sentiment, matchedKeywords, isImportant } = analyzeSentimentAndImportance(cleanTitle);
-            
-            // Check if published within last 30 minutes
-            const isNew = (now - pubDate) < (30 * 60 * 1000);
-            
-            parsedArticles.push({
-                id: btoa(encodeURIComponent(link)).substring(0, 32), // Short unique id from link
-                title: cleanTitle,
-                link,
-                source,
-                pubDate,
-                sentiment,
-                matchedKeywords,
-                isImportant,
-                isNew
-            });
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                const rawTitle = item.getElementsByTagName("title")[0]?.textContent || "";
+                const link = item.getElementsByTagName("link")[0]?.textContent || "";
+                const pubDateStr = item.getElementsByTagName("pubDate")[0]?.textContent || "";
+                const pubDate = new Date(pubDateStr);
+                
+                const parts = rawTitle.split(" - ");
+                const source = parts.length > 1 ? parts.pop() : "Google ニュース";
+                const cleanTitle = parts.join(" - ");
+                
+                const { sentiment, matchedKeywords, isImportant } = analyzeSentimentAndImportance(cleanTitle);
+                const isNew = (now - pubDate) < (30 * 60 * 1000);
+                
+                parsedArticles.push({
+                    id: btoa(encodeURIComponent(link)).substring(0, 32),
+                    title: cleanTitle,
+                    link,
+                    source,
+                    pubDate,
+                    sentiment,
+                    matchedKeywords,
+                    isImportant,
+                    isNew
+                });
+            }
         }
         
         // Cache parsed news
