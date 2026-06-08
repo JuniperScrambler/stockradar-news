@@ -71,6 +71,7 @@ body {
     flex-shrink: 0;
     transition: transform var(--transition-normal);
     z-index: 100;
+    padding-top: env(safe-area-inset-top, 0px);
 }
 
 .sidebar-header {
@@ -285,8 +286,8 @@ body {
 }
 
 .app-header {
-    height: 70px;
-    padding: 0 24px;
+    height: calc(70px + env(safe-area-inset-top, 0px));
+    padding: env(safe-area-inset-top, 0px) 24px 0 24px;
     display: flex;
     align-items: center;
     justify-content: space-between;
