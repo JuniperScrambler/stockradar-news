@@ -3,6 +3,80 @@
 // --------------------------------------------------------------------------
 const REFRESH_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes auto-refresh
 
+const US_TICKER_LOOKUP = {
+    AAPL: { name: "Apple", keyword: "Apple OR アップル", symbol: "NASDAQ:AAPL" },
+    MSFT: { name: "Microsoft", keyword: "Microsoft OR マイクロソフト", symbol: "NASDAQ:MSFT" },
+    NVDA: { name: "NVIDIA", keyword: "NVIDIA OR エヌビディア", symbol: "NASDAQ:NVDA" },
+    TSLA: { name: "Tesla", keyword: "Tesla OR テスラ", symbol: "NASDAQ:TSLA" },
+    META: { name: "Meta Platforms", keyword: "\"Meta Platforms\" OR メタ", symbol: "NASDAQ:META" },
+    AMZN: { name: "Amazon", keyword: "Amazon OR アマゾン", symbol: "NASDAQ:AMZN" },
+    GOOGL: { name: "Alphabet", keyword: "Alphabet OR Google OR グーグル", symbol: "NASDAQ:GOOGL" },
+    GOOG: { name: "Alphabet", keyword: "Alphabet OR Google OR グーグル", symbol: "NASDAQ:GOOG" },
+    NFLX: { name: "Netflix", keyword: "Netflix OR ネットフリックス", symbol: "NASDAQ:NFLX" },
+    AMD: { name: "AMD", keyword: "AMD OR Advanced Micro Devices", symbol: "NASDAQ:AMD" },
+    INTC: { name: "Intel", keyword: "Intel OR インテル", symbol: "NASDAQ:INTC" },
+    AVGO: { name: "Broadcom", keyword: "Broadcom OR ブロードコム", symbol: "NASDAQ:AVGO" },
+    ORCL: { name: "Oracle", keyword: "Oracle OR オラクル", symbol: "NYSE:ORCL" },
+    CRM: { name: "Salesforce", keyword: "Salesforce OR セールスフォース", symbol: "NYSE:CRM" },
+    IBM: { name: "IBM", keyword: "IBM", symbol: "NYSE:IBM" },
+    JPM: { name: "JPMorgan Chase", keyword: "JPMorgan OR JPモルガン", symbol: "NYSE:JPM" },
+    BAC: { name: "Bank of America", keyword: "\"Bank of America\" OR バンク・オブ・アメリカ", symbol: "NYSE:BAC" },
+    V: { name: "Visa", keyword: "Visa OR ビザ", symbol: "NYSE:V" },
+    MA: { name: "Mastercard", keyword: "Mastercard OR マスターカード", symbol: "NYSE:MA" },
+    DIS: { name: "Disney", keyword: "Disney OR ディズニー", symbol: "NYSE:DIS" },
+    NKE: { name: "Nike", keyword: "Nike OR ナイキ", symbol: "NYSE:NKE" },
+    MCD: { name: "McDonald's", keyword: "McDonald OR マクドナルド", symbol: "NYSE:MCD" },
+    SBUX: { name: "Starbucks", keyword: "Starbucks OR スターバックス", symbol: "NASDAQ:SBUX" },
+    COST: { name: "Costco", keyword: "Costco OR コストコ", symbol: "NASDAQ:COST" },
+    WMT: { name: "Walmart", keyword: "Walmart OR ウォルマート", symbol: "NYSE:WMT" },
+    KO: { name: "Coca-Cola", keyword: "Coca-Cola OR コカ・コーラ", symbol: "NYSE:KO" },
+    PEP: { name: "PepsiCo", keyword: "PepsiCo OR ペプシコ", symbol: "NASDAQ:PEP" },
+    JNJ: { name: "Johnson & Johnson", keyword: "\"Johnson & Johnson\" OR J&J", symbol: "NYSE:JNJ" },
+    PFE: { name: "Pfizer", keyword: "Pfizer OR ファイザー", symbol: "NYSE:PFE" },
+    LLY: { name: "Eli Lilly", keyword: "\"Eli Lilly\" OR イーライリリー", symbol: "NYSE:LLY" },
+    UNH: { name: "UnitedHealth", keyword: "UnitedHealth OR ユナイテッドヘルス", symbol: "NYSE:UNH" },
+    XOM: { name: "Exxon Mobil", keyword: "\"Exxon Mobil\" OR エクソンモービル", symbol: "NYSE:XOM" },
+    CVX: { name: "Chevron", keyword: "Chevron OR シェブロン", symbol: "NYSE:CVX" },
+    BA: { name: "Boeing", keyword: "Boeing OR ボーイング", symbol: "NYSE:BA" },
+    CAT: { name: "Caterpillar", keyword: "Caterpillar OR キャタピラー", symbol: "NYSE:CAT" },
+    GE: { name: "GE Aerospace", keyword: "\"GE Aerospace\" OR ゼネラル・エレクトリック", symbol: "NYSE:GE" },
+    F: { name: "Ford", keyword: "Ford OR フォード", symbol: "NYSE:F" },
+    GM: { name: "General Motors", keyword: "\"General Motors\" OR GM", symbol: "NYSE:GM" },
+    UBER: { name: "Uber", keyword: "Uber OR ウーバー", symbol: "NYSE:UBER" },
+    ABNB: { name: "Airbnb", keyword: "Airbnb OR エアビー", symbol: "NASDAQ:ABNB" },
+    SHOP: { name: "Shopify", keyword: "Shopify OR ショッピファイ", symbol: "NYSE:SHOP" },
+    BABA: { name: "Alibaba", keyword: "Alibaba OR アリババ", symbol: "NYSE:BABA" },
+    TSM: { name: "TSMC", keyword: "TSMC OR 台湾積体電路", symbol: "NYSE:TSM" },
+    SONY: { name: "Sony Group", keyword: "Sony OR ソニー", symbol: "NYSE:SONY" }
+};
+
+const JP_CODE_LOOKUP = {
+    7203: { name: "トヨタ自動車", keyword: "トヨタ", symbol: "TSE:7203" },
+    6758: { name: "ソニーグループ", keyword: "ソニー", symbol: "TSE:6758" },
+    9984: { name: "ソフトバンクグループ", keyword: "ソフトバンクグループ", symbol: "TSE:9984" },
+    8035: { name: "東京エレクトロン", keyword: "東京エレクトロン", symbol: "TSE:8035" },
+    6861: { name: "キーエンス", keyword: "キーエンス", symbol: "TSE:6861" },
+    6098: { name: "リクルート", keyword: "リクルート", symbol: "TSE:6098" },
+    8306: { name: "三菱UFJフィナンシャル・グループ", keyword: "三菱UFJ", symbol: "TSE:8306" },
+    8411: { name: "みずほフィナンシャルグループ", keyword: "みずほ", symbol: "TSE:8411" },
+    9432: { name: "NTT", keyword: "NTT", symbol: "TSE:9432" },
+    9433: { name: "KDDI", keyword: "KDDI", symbol: "TSE:9433" },
+    7974: { name: "任天堂", keyword: "任天堂", symbol: "TSE:7974" },
+    6954: { name: "ファナック", keyword: "ファナック", symbol: "TSE:6954" },
+    6501: { name: "日立製作所", keyword: "日立", symbol: "TSE:6501" },
+    6752: { name: "パナソニック", keyword: "パナソニック", symbol: "TSE:6752" },
+    7267: { name: "ホンダ", keyword: "ホンダ", symbol: "TSE:7267" },
+    7201: { name: "日産自動車", keyword: "日産自動車", symbol: "TSE:7201" }
+};
+
+function getTickerInfo(ticker) {
+    return US_TICKER_LOOKUP[ticker.toUpperCase()] || null;
+}
+
+function getJapaneseStockInfo(code) {
+    return JP_CODE_LOOKUP[code] || null;
+}
+
 // Determine the news fetch URL based on environment (local python proxy vs allorigins for GitHub Pages)
 function getNewsUrl(query) {
     const hostname = window.location.hostname;
@@ -40,33 +114,52 @@ function parseStockInput(rawInput) {
     
     if (tvMatch) {
         symbol = tvMatch[0].toUpperCase();
+        const ticker = symbol.split(":")[1];
+        const tickerInfo = getTickerInfo(ticker);
+        const jpInfo = getJapaneseStockInfo(ticker);
         const cleanName = input.replace(new RegExp(tvMatch[0], 'i'), "").replace(/\s+/g, " ").trim();
         if (cleanName) {
             name = cleanName;
             keyword = cleanName;
+        } else if (tickerInfo) {
+            name = tickerInfo.name;
+            keyword = tickerInfo.keyword;
+            symbol = tickerInfo.symbol;
+        } else if (jpInfo) {
+            name = jpInfo.name;
+            keyword = jpInfo.keyword;
+            symbol = jpInfo.symbol;
         } else {
-            name = symbol.split(":")[1];
+            name = ticker;
             keyword = name;
         }
     } else if (jpCodeMatch) {
         const code = jpCodeMatch[0];
-        symbol = `TSE:${code}`;
+        const jpInfo = getJapaneseStockInfo(code);
+        symbol = jpInfo?.symbol || `TSE:${code}`;
         const cleanName = input.replace(code, "").replace(/\s+/g, " ").trim();
         if (cleanName) {
             name = cleanName;
             keyword = cleanName;
+        } else if (jpInfo) {
+            name = jpInfo.name;
+            keyword = jpInfo.keyword;
         } else {
             name = `コード ${code}`;
             keyword = code;
         }
     } else if (usTickerMatch) {
         const ticker = usTickerMatch[0].toUpperCase();
+        const tickerInfo = getTickerInfo(ticker);
         const exchange = ticker.length === 4 ? "NASDAQ" : "NYSE";
-        symbol = `${exchange}:${ticker}`;
+        symbol = tickerInfo?.symbol || `${exchange}:${ticker}`;
         const cleanName = input.replace(new RegExp(usTickerMatch[0], 'i'), "").replace(/\s+/g, " ").trim();
         if (cleanName) {
             name = cleanName;
-            keyword = cleanName;
+            keyword = tickerInfo ? `${cleanName} OR ${tickerInfo.keyword}` : cleanName;
+        } else if (tickerInfo) {
+            name = tickerInfo.name;
+            keyword = tickerInfo.keyword;
         } else {
             name = ticker;
             keyword = ticker;
@@ -124,7 +217,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // Select first stock or show empty state
     if (state.stocks.length > 0) {
-        selectStock(state.stocks[0].id);
+        selectStock(state.activeStockId || state.stocks[0].id);
     } else {
         renderStockList();
         renderNews();
@@ -252,14 +345,13 @@ function setupEventHandlers() {
             };
             
             state.stocks.push(newStock);
+            state.activeStockId = newStock.id;
             saveStocksToStorage();
-            renderStockList();
+            localStorage.setItem("sr_active_stock_id", newStock.id);
             hideModal();
             setTimeout(() => {
-                selectStock(newStock.id);
-                resetViewportScroll();
-                showToast(`「${parsed.name}」を登録しました`);
-            }, 350);
+                window.location.reload();
+            }, 200);
         } else {
             showToast("入力内容を解析できませんでした", "error");
         }

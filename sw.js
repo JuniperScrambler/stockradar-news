@@ -1,4 +1,4 @@
-const CACHE_NAME = "stockradar-cache-v7";
+const CACHE_NAME = "stockradar-cache-v8";
 const ASSETS_TO_CACHE = [
     "./",
     "./index.html",
