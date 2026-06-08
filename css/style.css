@@ -982,12 +982,12 @@ input:checked + .slider:before {
     }
     
     .app-header {
-        padding: 0 16px;
-        height: 64px;
+        padding: env(safe-area-inset-top, 0px) 16px 0 16px;
+        height: calc(64px + env(safe-area-inset-top, 0px));
     }
     
     .content-body {
-        padding: 16px;
+        padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px)) 16px;
         gap: 16px;
     }
     

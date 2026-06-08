@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>StockRadar News</title>
     <!-- SEO & Web App Meta Tags -->
     <meta name="description" content="株価に影響する重要ニュースをリアルタイムで収集・分析する投資支援PWAツール">
@@ -147,18 +147,14 @@
             </div>
             <form class="modal-body" id="addStockForm">
                 <div class="form-group">
-                    <label for="stockInputName">銘柄名 / 企業名 <span class="required">*</span></label>
-                    <input type="text" id="stockInputName" placeholder="例: トヨタ自動車, Apple, 任天堂" required autocomplete="off">
-                </div>
-                <div class="form-group">
-                    <label for="stockInputKeyword">ニュース検索用キーワード (決算ニュース等の精度向上に影響) <span class="required">*</span></label>
-                    <input type="text" id="stockInputKeyword" placeholder="例: トヨタ, Apple, 任天堂" required autocomplete="off">
-                    <p class="form-help">Googleニュースで検索する際の名前です。企業名が長い場合は略称を推奨します。</p>
-                </div>
-                <div class="form-group">
-                    <label for="stockInputSymbol">TradingViewシンボル (株価チャート用・任意)</label>
-                    <input type="text" id="stockInputSymbol" placeholder="例: TSE:7203, NASDAQ:AAPL, TSE:7974" autocomplete="off">
-                    <p class="form-help">TradingView対応のシンボルです（日本株は <code>TSE:コード</code>、米国株は直接のティッカーシンボルなど）。入力しない場合チャートは表示されません。</p>
+                    <label for="stockInputSingle">銘柄名・コード・ティッカー <span class="required">*</span></label>
+                    <input type="text" id="stockInputSingle" placeholder="例: トヨタ 7203, Apple, ソニー NYSE:SONY" required autocomplete="off">
+                    <p class="form-help">
+                        名前とコードをスペース区切りで同時入力すると自動で解析します。<br>
+                        ・日本株: <code>トヨタ 7203</code> または単に <code>7203</code><br>
+                        ・米国株: <code>Apple AAPL</code> または単に <code>AAPL</code><br>
+                        ・チャート付き日本株 (ADR): <code>ソニー NYSE:SONY</code> 
+                    </p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="cancelAddBtn">キャンセル</button>

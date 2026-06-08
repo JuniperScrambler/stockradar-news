@@ -22,6 +22,60 @@ function getNewsUrl(query) {
     }
 }
 
+// Helper to parse single stock input into name, keyword, and symbol
+function parseStockInput(rawInput) {
+    const input = rawInput.trim();
+    if (!input) return null;
+    
+    let name = input;
+    let keyword = input;
+    let symbol = null;
+    
+    // 1. Check for full TradingView symbol format (e.g. NYSE:SONY, TSE:7203, NASDAQ:AAPL)
+    const tvMatch = input.match(/\b([A-Z]{2,6}:[A-Z0-9]{1,6})\b/i);
+    // 2. Check for isolated Japanese stock code (4 digits)
+    const jpCodeMatch = input.match(/\b(\d{4})\b/);
+    // 3. Check for isolated US ticker (1 to 5 uppercase letters, like AAPL, SONY, TSLA)
+    const usTickerMatch = input.match(/\b([A-Z]{1,5})\b/);
+    
+    if (tvMatch) {
+        symbol = tvMatch[0].toUpperCase();
+        const cleanName = input.replace(tvMatch[0], "").replace(/\s+/g, " ").trim();
+        if (cleanName) {
+            name = cleanName;
+            keyword = cleanName;
+        } else {
+            name = symbol.split(":")[1];
+            keyword = name;
+        }
+    } else if (jpCodeMatch) {
+        const code = jpCodeMatch[0];
+        symbol = `TSE:${code}`;
+        const cleanName = input.replace(code, "").replace(/\s+/g, " ").trim();
+        if (cleanName) {
+            name = cleanName;
+            keyword = cleanName;
+        } else {
+            name = `コード ${code}`;
+            keyword = code;
+        }
+    } else if (usTickerMatch) {
+        const ticker = usTickerMatch[0];
+        const exchange = ticker.length === 4 ? "NASDAQ" : "NYSE";
+        symbol = `${exchange}:${ticker}`;
+        const cleanName = input.replace(ticker, "").replace(/\s+/g, " ").trim();
+        if (cleanName) {
+            name = cleanName;
+            keyword = cleanName;
+        } else {
+            name = ticker;
+            keyword = ticker;
+        }
+    }
+    
+    return { name, keyword, symbol };
+}
+
 // Sentiment and importance keywords
 const POSITIVE_KEYWORDS = [
     "上方修正", "増益", "最高益", "黒字化", "黒字", "業務提携", "提携", 
@@ -167,6 +221,15 @@ function setupEventHandlers() {
     const hideModal = () => {
         addModal.classList.remove("active");
         document.getElementById("addStockForm").reset();
+        // Force scroll reset to fix iOS Safari keyboard viewport shift bug
+        window.scrollTo(0, 0);
+        document.body.scrollTop = 0;
+        
+        // Also run after keyboard closing transition completes (approx 300ms)
+        setTimeout(() => {
+            window.scrollTo(0, 0);
+            document.body.scrollTop = 0;
+        }, 300);
     };
     
     openAddModalBtn.addEventListener("click", showModal);
@@ -180,21 +243,15 @@ function setupEventHandlers() {
     const addStockForm = document.getElementById("addStockForm");
     addStockForm.addEventListener("submit", (e) => {
         e.preventDefault();
-        const name = document.getElementById("stockInputName").value.trim();
-        const keyword = document.getElementById("stockInputKeyword").value.trim();
-        let symbol = document.getElementById("stockInputSymbol").value.trim().toUpperCase();
+        const rawInput = document.getElementById("stockInputSingle").value.trim();
         
-        // Auto format JP code if user just enters digits
-        if (/^\d{4}$/.test(symbol)) {
-            symbol = `TSE:${symbol}`;
-        }
-        
-        if (name && keyword) {
+        const parsed = parseStockInput(rawInput);
+        if (parsed) {
             const newStock = {
                 id: Date.now().toString(),
-                name,
-                keyword,
-                symbol: symbol || null
+                name: parsed.name,
+                keyword: parsed.keyword,
+                symbol: parsed.symbol
             };
             
             state.stocks.push(newStock);
@@ -202,7 +259,9 @@ function setupEventHandlers() {
             renderStockList();
             hideModal();
             selectStock(newStock.id);
-            showToast(`「${name}」を登録しました`);
+            showToast(`「${parsed.name}」を登録しました`);
+        } else {
+            showToast("入力内容を解析できませんでした", "error");
         }
     });
 
