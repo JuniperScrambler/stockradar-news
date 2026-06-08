@@ -1,4 +1,4 @@
-const CACHE_NAME = "stockradar-cache-v1";
+const CACHE_NAME = "stockradar-cache-v2";
 const ASSETS_TO_CACHE = [
     "./",
     "./index.html",
@@ -39,9 +39,9 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
     const url = new URL(event.request.url);
     
-    // Ignore allorigins / CORS proxy calls or TradingView script fetches for caching
+    // Ignore codetabs / CORS proxy calls or TradingView script fetches for caching
     // We want real-time dynamic data to always fetch from network
-    if (url.href.includes("api.allorigins.win") || url.href.includes("tradingview")) {
+    if (url.href.includes("codetabs") || url.href.includes("tradingview")) {
         event.respondWith(fetch(event.request));
         return;
     }
