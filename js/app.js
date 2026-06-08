@@ -35,12 +35,12 @@ function parseStockInput(rawInput) {
     const tvMatch = input.match(/\b([A-Z]{2,6}:[A-Z0-9]{1,6})\b/i);
     // 2. Check for isolated Japanese stock code (4 digits)
     const jpCodeMatch = input.match(/\b(\d{4})\b/);
-    // 3. Check for isolated US ticker (1 to 5 uppercase letters, like AAPL, SONY, TSLA)
-    const usTickerMatch = input.match(/\b([A-Z]{1,5})\b/);
+    // 3. Check for isolated US ticker (1 to 5 letters, like AAPL, SONY, TSLA, NVDA)
+    const usTickerMatch = input.match(/\b([A-Z]{1,5})\b/i);
     
     if (tvMatch) {
         symbol = tvMatch[0].toUpperCase();
-        const cleanName = input.replace(tvMatch[0], "").replace(/\s+/g, " ").trim();
+        const cleanName = input.replace(new RegExp(tvMatch[0], 'i'), "").replace(/\s+/g, " ").trim();
         if (cleanName) {
             name = cleanName;
             keyword = cleanName;
@@ -60,10 +60,10 @@ function parseStockInput(rawInput) {
             keyword = code;
         }
     } else if (usTickerMatch) {
-        const ticker = usTickerMatch[0];
+        const ticker = usTickerMatch[0].toUpperCase();
         const exchange = ticker.length === 4 ? "NASDAQ" : "NYSE";
         symbol = `${exchange}:${ticker}`;
-        const cleanName = input.replace(ticker, "").replace(/\s+/g, " ").trim();
+        const cleanName = input.replace(new RegExp(usTickerMatch[0], 'i'), "").replace(/\s+/g, " ").trim();
         if (cleanName) {
             name = cleanName;
             keyword = cleanName;
@@ -453,6 +453,89 @@ function deleteStock(stockId) {
 // --------------------------------------------------------------------------
 let cachedNews = {}; // In-memory cache for news feed by stock ID
 
+function generateArticleId(link) {
+    try {
+        return btoa(encodeURIComponent(link)).substring(0, 32);
+    } catch (e) {
+        return Math.random().toString(36).substring(2, 15);
+    }
+}
+
+function parseXmlFeed(xmlText) {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+    
+    const parserError = xmlDoc.getElementsByTagName("parsererror");
+    if (parserError.length > 0) {
+        throw new Error("XML parse error: " + parserError[0].textContent);
+    }
+    
+    const items = xmlDoc.getElementsByTagName("item");
+    const parsedArticles = [];
+    const now = new Date();
+    
+    for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const rawTitle = item.getElementsByTagName("title")[0]?.textContent || "";
+        const link = item.getElementsByTagName("link")[0]?.textContent || "";
+        const pubDateStr = item.getElementsByTagName("pubDate")[0]?.textContent || "";
+        const pubDate = new Date(pubDateStr);
+        
+        const parts = rawTitle.split(" - ");
+        const source = parts.length > 1 ? parts.pop() : "Google ニュース";
+        const cleanTitle = parts.join(" - ");
+        
+        const { sentiment, matchedKeywords, isImportant } = analyzeSentimentAndImportance(cleanTitle);
+        const isNew = (now - pubDate) < (30 * 60 * 1000);
+        
+        parsedArticles.push({
+            id: generateArticleId(link),
+            title: cleanTitle,
+            link,
+            source,
+            pubDate,
+            sentiment,
+            matchedKeywords,
+            isImportant,
+            isNew
+        });
+    }
+    return parsedArticles;
+}
+
+function parseRss2JsonItems(items) {
+    const parsedArticles = [];
+    const now = new Date();
+    
+    items.forEach(item => {
+        const rawTitle = item.title || "";
+        const link = item.link || "";
+        const pubDateStr = item.pubDate || "";
+        const formattedDateStr = pubDateStr.includes(" ") ? pubDateStr.replace(" ", "T") + "Z" : pubDateStr;
+        const pubDate = new Date(formattedDateStr);
+        
+        const parts = rawTitle.split(" - ");
+        const source = parts.length > 1 ? parts.pop() : "Google ニュース";
+        const cleanTitle = parts.join(" - ");
+        
+        const { sentiment, matchedKeywords, isImportant } = analyzeSentimentAndImportance(cleanTitle);
+        const isNew = (now - pubDate) < (30 * 60 * 1000);
+        
+        parsedArticles.push({
+            id: generateArticleId(link),
+            title: cleanTitle,
+            link,
+            source,
+            pubDate,
+            sentiment,
+            matchedKeywords,
+            isImportant,
+            isNew
+        });
+    });
+    return parsedArticles;
+}
+
 async function fetchNewsForActiveStock(isManual = false) {
     if (!state.activeStockId || state.showBookmarks) return;
     
@@ -467,118 +550,82 @@ async function fetchNewsForActiveStock(isManual = false) {
     
     // Construct Search Query: Name & important business/financial keywords
     const optimizedQuery = `(${stock.keyword}) AND (決算 OR 業績 OR 株価 OR 提携 OR 買収 OR 上方修正 OR 下方修正 OR 新製品)`;
-    const requestUrl = getNewsUrl(optimizedQuery);
+    
+    const hostname = window.location.hostname;
+    const isLocal = hostname === "localhost" || 
+                    hostname === "127.0.0.1" || 
+                    hostname.startsWith("192.168.") || 
+                    hostname.startsWith("10.") ||
+                    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname);
+                    
+    const googleNewsUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(optimizedQuery)}&hl=ja&gl=JP&ceid=JP:ja`;
+    
+    let success = false;
+    let parsedArticles = [];
+    const now = new Date();
     
     try {
-        const response = await fetch(requestUrl);
-        if (!response.ok) throw new Error("ニュースデータの取得に失敗しました");
-        
-        let parsedArticles = [];
-        const now = new Date();
-        
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
+        if (isLocal) {
+            // Local development: use custom python server proxy
+            console.log("Fetching news via local server proxy...");
+            const response = await fetch(`/api/news?q=${encodeURIComponent(optimizedQuery)}&t=${Date.now()}`);
+            if (!response.ok) throw new Error("Local proxy server returned status " + response.status);
             const data = await response.json();
-            
-            // Check if this is the rss2json format (production environment)
-            if (data && data.status === "ok" && data.items) {
-                data.items.forEach(item => {
-                    const rawTitle = item.title || "";
-                    const link = item.link || "";
-                    const pubDateStr = item.pubDate || "";
-                    // Convert "2026-06-07 05:41:42" to Date (append Z to parse as UTC)
-                    const formattedDateStr = pubDateStr.replace(" ", "T") + "Z";
-                    const pubDate = new Date(formattedDateStr);
-                    
-                    const parts = rawTitle.split(" - ");
-                    const source = parts.length > 1 ? parts.pop() : "Google ニュース";
-                    const cleanTitle = parts.join(" - ");
-                    
-                    const { sentiment, matchedKeywords, isImportant } = analyzeSentimentAndImportance(cleanTitle);
-                    const isNew = (now - pubDate) < (30 * 60 * 1000);
-                    
-                    parsedArticles.push({
-                        id: btoa(encodeURIComponent(link)).substring(0, 32),
-                        title: cleanTitle,
-                        link,
-                        source,
-                        pubDate,
-                        sentiment,
-                        matchedKeywords,
-                        isImportant,
-                        isNew
-                    });
-                });
-            } else if (data && data.contents) {
-                // Parse XML from local proxy wrapping
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(data.contents, "text/xml");
-                const items = xmlDoc.getElementsByTagName("item");
-                
-                for (let i = 0; i < items.length; i++) {
-                    const item = items[i];
-                    const rawTitle = item.getElementsByTagName("title")[0]?.textContent || "";
-                    const link = item.getElementsByTagName("link")[0]?.textContent || "";
-                    const pubDateStr = item.getElementsByTagName("pubDate")[0]?.textContent || "";
-                    const pubDate = new Date(pubDateStr);
-                    
-                    const parts = rawTitle.split(" - ");
-                    const source = parts.length > 1 ? parts.pop() : "Google ニュース";
-                    const cleanTitle = parts.join(" - ");
-                    
-                    const { sentiment, matchedKeywords, isImportant } = analyzeSentimentAndImportance(cleanTitle);
-                    const isNew = (now - pubDate) < (30 * 60 * 1000);
-                    
-                    parsedArticles.push({
-                        id: btoa(encodeURIComponent(link)).substring(0, 32),
-                        title: cleanTitle,
-                        link,
-                        source,
-                        pubDate,
-                        sentiment,
-                        matchedKeywords,
-                        isImportant,
-                        isNew
-                    });
-                }
-            } else {
-                throw new Error("取得したデータの形式が正しくありません");
+            if (data && data.contents) {
+                parsedArticles = parseXmlFeed(data.contents);
+                success = true;
+            } else if (data && data.error) {
+                throw new Error("Local proxy returned error: " + data.error);
             }
         } else {
-            // Raw XML fallback
-            const xmlText = await response.text();
-            if (!xmlText) throw new Error("フィードデータを取得できませんでした");
+            // Production deployment: try failover proxies
+            const proxies = [
+                {
+                    name: "corsproxy.io",
+                    fetch: async () => {
+                        const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(googleNewsUrl)}`);
+                        if (!res.ok) throw new Error("corsproxy.io returned status " + res.status);
+                        const xmlText = await res.text();
+                        return parseXmlFeed(xmlText);
+                    }
+                },
+                {
+                    name: "allorigins.win",
+                    fetch: async () => {
+                        const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(googleNewsUrl)}&t=${Date.now()}`);
+                        if (!res.ok) throw new Error("allorigins.win returned status " + res.status);
+                        const data = await res.json();
+                        if (!data || !data.contents) throw new Error("allorigins.win returned empty contents");
+                        return parseXmlFeed(data.contents);
+                    }
+                },
+                {
+                    name: "rss2json.com",
+                    fetch: async () => {
+                        const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(googleNewsUrl)}`);
+                        if (!res.ok) throw new Error("rss2json.com returned status " + res.status);
+                        const data = await res.json();
+                        if (!data || data.status !== "ok" || !data.items) throw new Error("rss2json.com returned error status");
+                        return parseRss2JsonItems(data.items);
+                    }
+                }
+            ];
             
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(xmlText, "text/xml");
-            const items = xmlDoc.getElementsByTagName("item");
-            
-            for (let i = 0; i < items.length; i++) {
-                const item = items[i];
-                const rawTitle = item.getElementsByTagName("title")[0]?.textContent || "";
-                const link = item.getElementsByTagName("link")[0]?.textContent || "";
-                const pubDateStr = item.getElementsByTagName("pubDate")[0]?.textContent || "";
-                const pubDate = new Date(pubDateStr);
-                
-                const parts = rawTitle.split(" - ");
-                const source = parts.length > 1 ? parts.pop() : "Google ニュース";
-                const cleanTitle = parts.join(" - ");
-                
-                const { sentiment, matchedKeywords, isImportant } = analyzeSentimentAndImportance(cleanTitle);
-                const isNew = (now - pubDate) < (30 * 60 * 1000);
-                
-                parsedArticles.push({
-                    id: btoa(encodeURIComponent(link)).substring(0, 32),
-                    title: cleanTitle,
-                    link,
-                    source,
-                    pubDate,
-                    sentiment,
-                    matchedKeywords,
-                    isImportant,
-                    isNew
-                });
+            for (const proxy of proxies) {
+                try {
+                    console.log(`Attempting fetch via ${proxy.name}...`);
+                    parsedArticles = await proxy.fetch();
+                    success = true;
+                    console.log(`Fetch via ${proxy.name} succeeded!`);
+                    break;
+                } catch (err) {
+                    console.warn(`Fetch via ${proxy.name} failed:`, err);
+                }
             }
+        }
+        
+        if (!success) {
+            throw new Error("すべてのプロキシサーバーでニュースの取得に失敗しました");
         }
         
         // Cache parsed news
@@ -595,7 +642,6 @@ async function fetchNewsForActiveStock(isManual = false) {
     } catch (err) {
         console.error("News fetch failed:", err);
         showToast("ニュースの取得に失敗しました", "error");
-        // Maintain empty list or load from cache
         if (!cachedNews[stock.id]) {
             cachedNews[stock.id] = [];
         }
@@ -869,3 +915,50 @@ function showToast(message, type = "success") {
         });
     }, 3000);
 }
+
+// --------------------------------------------------------------------------
+// Viewport & Scroll Locking for iOS Safari (keyboard/iframe focus bug)
+// --------------------------------------------------------------------------
+let isInputFocused = false;
+
+function resetViewportScroll() {
+    window.scrollTo(0, 0);
+    document.body.scrollTop = 0;
+    document.documentElement.scrollTop = 0;
+}
+
+document.addEventListener("focusin", (e) => {
+    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") {
+        isInputFocused = true;
+    }
+});
+
+document.addEventListener("focusout", (e) => {
+    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") {
+        isInputFocused = false;
+        // Reset scroll when keyboard closes
+        setTimeout(resetViewportScroll, 100);
+        setTimeout(resetViewportScroll, 300);
+        setTimeout(resetViewportScroll, 600);
+    }
+});
+
+function lockViewportScroll() {
+    if (isInputFocused) return;
+    
+    if (window.scrollY !== 0 || window.scrollX !== 0) {
+        window.scrollTo(0, 0);
+    }
+    if (document.body.scrollTop !== 0 || document.body.scrollLeft !== 0) {
+        document.body.scrollTop = 0;
+        document.body.scrollLeft = 0;
+    }
+    if (document.documentElement.scrollTop !== 0 || document.documentElement.scrollLeft !== 0) {
+        document.documentElement.scrollTop = 0;
+        document.documentElement.scrollLeft = 0;
+    }
+}
+
+// Attach passive scroll listeners to window and body
+window.addEventListener("scroll", lockViewportScroll, { passive: true });
+document.body.addEventListener("scroll", lockViewportScroll, { passive: true });
