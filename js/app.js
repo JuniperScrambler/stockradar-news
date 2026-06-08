@@ -219,17 +219,14 @@ function setupEventHandlers() {
     
     const showModal = () => addModal.classList.add("active");
     const hideModal = () => {
+        document.activeElement?.blur?.();
         addModal.classList.remove("active");
         document.getElementById("addStockForm").reset();
-        // Force scroll reset to fix iOS Safari keyboard viewport shift bug
-        window.scrollTo(0, 0);
-        document.body.scrollTop = 0;
+        resetViewportScroll();
         
         // Also run after keyboard closing transition completes (approx 300ms)
-        setTimeout(() => {
-            window.scrollTo(0, 0);
-            document.body.scrollTop = 0;
-        }, 300);
+        setTimeout(resetViewportScroll, 300);
+        setTimeout(resetViewportScroll, 600);
     };
     
     openAddModalBtn.addEventListener("click", showModal);
@@ -258,8 +255,11 @@ function setupEventHandlers() {
             saveStocksToStorage();
             renderStockList();
             hideModal();
-            selectStock(newStock.id);
-            showToast(`「${parsed.name}」を登録しました`);
+            setTimeout(() => {
+                selectStock(newStock.id);
+                resetViewportScroll();
+                showToast(`「${parsed.name}」を登録しました`);
+            }, 350);
         } else {
             showToast("入力内容を解析できませんでした", "error");
         }
@@ -922,9 +922,20 @@ function showToast(message, type = "success") {
 let isInputFocused = false;
 
 function resetViewportScroll() {
+    const scrollRoot = document.scrollingElement || document.documentElement;
     window.scrollTo(0, 0);
+    scrollRoot.scrollTop = 0;
+    scrollRoot.scrollLeft = 0;
     document.body.scrollTop = 0;
+    document.body.scrollLeft = 0;
     document.documentElement.scrollTop = 0;
+    document.documentElement.scrollLeft = 0;
+
+    requestAnimationFrame(() => {
+        window.scrollTo(0, 0);
+        scrollRoot.scrollTop = 0;
+        scrollRoot.scrollLeft = 0;
+    });
 }
 
 document.addEventListener("focusin", (e) => {
