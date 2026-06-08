@@ -970,6 +970,28 @@ input:checked + .slider:before {
 /* Responsive Layout (Mobile / Tablet)                                       */
 /* -------------------------------------------------------------------------- */
 @media (max-width: 768px) {
+    html,
+    body {
+        height: auto;
+        min-height: 100%;
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+
+    .app-container {
+        min-height: 100svh;
+        min-height: 100dvh;
+        height: auto;
+        overflow: visible;
+    }
+
+    .main-panel {
+        min-height: 100svh;
+        min-height: 100dvh;
+        height: auto;
+        overflow: visible;
+    }
+
     .sidebar {
         position: fixed;
         top: 0;
@@ -999,6 +1021,7 @@ input:checked + .slider:before {
     .content-body {
         padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px)) 16px;
         gap: 16px;
+        overflow: visible;
     }
     
     .chart-wrapper {

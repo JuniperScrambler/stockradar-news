@@ -923,6 +923,7 @@ let isInputFocused = false;
 
 function resetViewportScroll() {
     const scrollRoot = document.scrollingElement || document.documentElement;
+    const header = document.querySelector(".app-header");
     window.scrollTo(0, 0);
     scrollRoot.scrollTop = 0;
     scrollRoot.scrollLeft = 0;
@@ -930,11 +931,13 @@ function resetViewportScroll() {
     document.body.scrollLeft = 0;
     document.documentElement.scrollTop = 0;
     document.documentElement.scrollLeft = 0;
+    header?.scrollIntoView?.({ block: "start", inline: "nearest" });
 
     requestAnimationFrame(() => {
         window.scrollTo(0, 0);
         scrollRoot.scrollTop = 0;
         scrollRoot.scrollLeft = 0;
+        header?.scrollIntoView?.({ block: "start", inline: "nearest" });
     });
 }
 
@@ -955,6 +958,7 @@ document.addEventListener("focusout", (e) => {
 });
 
 function lockViewportScroll() {
+    if (window.matchMedia("(max-width: 768px)").matches) return;
     if (isInputFocused) return;
     
     if (window.scrollY !== 0 || window.scrollX !== 0) {
