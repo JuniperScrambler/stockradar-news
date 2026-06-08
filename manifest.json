@@ -1,0 +1,22 @@
+{
+  "name": "StockRadar News",
+  "short_name": "StockRadar",
+  "description": "株価に影響する重要ニュースをリアルタイムで収集・分析する投資支援PWAツール",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#070a13",
+  "theme_color": "#0b0f19",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

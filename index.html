@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>StockRadar News</title>
+    <!-- SEO & Web App Meta Tags -->
+    <meta name="description" content="株価に影響する重要ニュースをリアルタイムで収集・分析する投資支援PWAツール">
+    <meta name="theme-color" content="#0b0f19">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="css/style.css">
+
+    <!-- TradingView Widget Library -->
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+    <!-- Main App Script -->
+    <script src="js/app.js" defer></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar: Stock Management -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-area">
+                    <svg class="logo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M3 17L9 11L13 15L21 7M21 7H16M21 7V12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <h1>StockRadar</h1>
+                </div>
+                <button class="close-sidebar-btn" id="closeSidebarBtn" aria-label="サイドバーを閉じる">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+
+            <div class="sidebar-content">
+                <button class="btn btn-primary add-stock-btn" id="openAddModalBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+                    銘柄を追加
+                </button>
+
+                <div class="stock-list-container">
+                    <h2 class="section-title">登録銘柄</h2>
+                    <ul class="stock-list" id="stockList">
+                        <!-- Dynamically populated -->
+                    </ul>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Panel -->
+        <main class="main-panel">
+            <!-- Header -->
+            <header class="app-header glass">
+                <div class="header-left">
+                    <button class="menu-toggle-btn" id="menuToggleBtn" aria-label="メニューを開く">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round"/></svg>
+                    </button>
+                    <div class="active-stock-info">
+                        <h2 class="active-stock-name" id="activeStockName">銘柄を選択してください</h2>
+                        <span class="active-stock-symbol" id="activeStockSymbol">--:----</span>
+                    </div>
+                </div>
+
+                <div class="header-right">
+                    <!-- Refresh Button -->
+                    <button class="icon-btn" id="refreshBtn" title="最新ニュースに更新" aria-label="更新">
+                        <svg class="refresh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 11-.57-8.38l5.67-5.67"/>
+                        </svg>
+                    </button>
+
+                    <!-- Filter Toggle Switch -->
+                    <div class="filter-switch-container" title="株価影響度が高い重要ニュースのみ表示">
+                        <span class="filter-label">重要🔥</span>
+                        <label class="switch">
+                            <input type="checkbox" id="importantToggle">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+
+                    <!-- Bookmark Toggle Button -->
+                    <button class="icon-btn" id="bookmarkViewBtn" title="ブックマーク一覧を表示" aria-label="ブックマーク">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                        </svg>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Main Layout Grid -->
+            <div class="content-body" id="contentBody">
+                <!-- TradingView Chart Section -->
+                <section class="chart-section" id="chartSection">
+                    <div class="chart-wrapper glass">
+                        <div id="tradingview_chart" class="tradingview-widget-container">
+                            <div class="chart-placeholder">
+                                <p>銘柄を選択するとリアルタイム株価チャートがここに表示されます</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-link-container" id="chartLinkContainer" style="display: none;">
+                        <a id="externalChartLink" href="#" target="_blank" rel="noopener" class="chart-link-btn">
+                            TradingViewで詳細チャートを開く ↗
+                        </a>
+                    </div>
+                </section>
+
+                <!-- News Section -->
+                <section class="news-section">
+                    <div class="news-header">
+                        <h3 class="news-section-title" id="newsTitle">ニュースフィード</h3>
+                        <span class="last-updated-text" id="lastUpdated">更新：未取得</span>
+                    </div>
+
+                    <!-- News Cards List -->
+                    <div class="news-list" id="newsList">
+                        <!-- Dynamically populated news cards -->
+                        <div class="empty-state">
+                            <div class="empty-icon">📈</div>
+                            <h3>StockRadarへようこそ</h3>
+                            <p>左側のメニューから銘柄を追加して、リアルタイムな投資情報を収集しましょう。</p>
+                            <button class="btn btn-primary" id="emptyStateAddBtn">銘柄を追加する</button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal Dialog: Add Stock -->
+    <div class="modal-overlay" id="addModal">
+        <div class="modal glass">
+            <div class="modal-header">
+                <h3>銘柄の追加</h3>
+                <button class="close-modal-btn" id="closeModalBtn" aria-label="閉じる">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+            <form class="modal-body" id="addStockForm">
+                <div class="form-group">
+                    <label for="stockInputName">銘柄名 / 企業名 <span class="required">*</span></label>
+                    <input type="text" id="stockInputName" placeholder="例: トヨタ自動車, Apple, 任天堂" required autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="stockInputKeyword">ニュース検索用キーワード (決算ニュース等の精度向上に影響) <span class="required">*</span></label>
+                    <input type="text" id="stockInputKeyword" placeholder="例: トヨタ, Apple, 任天堂" required autocomplete="off">
+                    <p class="form-help">Googleニュースで検索する際の名前です。企業名が長い場合は略称を推奨します。</p>
+                </div>
+                <div class="form-group">
+                    <label for="stockInputSymbol">TradingViewシンボル (株価チャート用・任意)</label>
+                    <input type="text" id="stockInputSymbol" placeholder="例: TSE:7203, NASDAQ:AAPL, TSE:7974" autocomplete="off">
+                    <p class="form-help">TradingView対応のシンボルです（日本株は <code>TSE:コード</code>、米国株は直接のティッカーシンボルなど）。入力しない場合チャートは表示されません。</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="cancelAddBtn">キャンセル</button>
+                    <button type="submit" class="btn btn-primary">登録する</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Offline Alert / Service Worker updates -->
+    <div class="toast-container" id="toastContainer"></div>
+</body>
+</html>
